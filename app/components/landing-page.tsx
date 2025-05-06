@@ -157,11 +157,11 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b">
+      <header className="sticky top-0 z-10 bg-background border-b">
         <div className="container flex items-center justify-between py-4">
           <div className="flex items-center gap-2 transition-all duration-300 hover:scale-105">
             <ListTodo className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold gradient-text">TodoApp</h1>
+            <h1 className="text-4xl font-bold gradient-text">TodoApp</h1>
           </div>
           <ThemeToggle />
         </div>

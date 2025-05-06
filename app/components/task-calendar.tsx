@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { DayPicker } from "react-day-picker"
 import { useTodoContext, type Task } from "../components/todo-provider"
 import { TaskItem } from "../components/task-item"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { format, isSameDay } from "date-fns"
-import type { DayPickerProps } from "react-day-picker"
+
+// Import the CSS for react-day-picker
+import "react-day-picker/dist/style.css"
 
 export function TaskCalendar() {
   const { tasks } = useTodoContext()
@@ -55,7 +57,7 @@ export function TaskCalendar() {
   }
 
   // Define modifiers for days with tasks
-  const modifiers: DayPickerProps["modifiers"] = {
+  const modifiers = {
     selected: selectedDate,
     "with-tasks": (date: Date) => {
       const dateKey = format(date, "yyyy-MM-dd")
@@ -68,12 +70,39 @@ export function TaskCalendar() {
     },
   }
 
-  // Removed the unused handleDayClick function
+  // Define custom CSS for the calendar
+  const css = `
+    .rdp-day_with-tasks {
+      position: relative;
+    }
+    .rdp-day_with-tasks::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background-color: hsl(var(--primary));
+    }
+    .rdp-day_with-overdue-tasks::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background-color: hsl(var(--destructive));
+    }
+  `
 
   return (
     <div className="grid gap-6 md:grid-cols-[400px_1fr]">
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 items-center">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium">{format(month, "MMMM yyyy")}</h2>
             <div className="flex items-center gap-1">
@@ -86,46 +115,22 @@ export function TaskCalendar() {
             </div>
           </div>
 
-          <style jsx global>{`
-            .rdp-day_with-tasks {
-              position: relative;
-            }
-            .rdp-day_with-tasks::after {
-              content: '';
-              position: absolute;
-              bottom: 4px;
-              left: 50%;
-              transform: translateX(-50%);
-              width: 4px;
-              height: 4px;
-              border-radius: 50%;
-              background-color: hsl(var(--primary));
-            }
-            .rdp-day_with-overdue-tasks::after {
-              content: '';
-              position: absolute;
-              bottom: 4px;
-              left: 50%;
-              transform: translateX(-50%);
-              width: 4px;
-              height: 4px;
-              border-radius: 50%;
-              background-color: hsl(var(--destructive));
-            }
-          `}</style>
+          <style>{css}</style>
 
-          <Calendar
+          <DayPicker
             mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
             month={month}
             onMonthChange={setMonth}
-            className="rounded-md border"
             modifiers={modifiers}
-            modifiersClassNames={{
-              "with-tasks": "rdp-day_with-tasks",
-              "with-overdue-tasks": "rdp-day_with-overdue-tasks",
+            onDayClick={(day, modifiers) => {
+              if (modifiers.selected) {
+                setSelectedDate(undefined)
+              } else {
+                setSelectedDate(day)
+              }
             }}
+            className="border rounded-md justify-center place-items-center"
+            footer={selectedDate && `${tasksForSelectedDate.length} tasks on ${format(selectedDate, "MMM d, yyyy")}`}
           />
         </CardContent>
       </Card>

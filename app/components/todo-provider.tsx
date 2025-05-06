@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { useAuth } from "../components/auth-provider"
 import { generateId } from "@/lib/utils"
 import { useToast } from "../components/toast-provider"
@@ -91,6 +91,37 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>(defaultCategories)
   const [activeFilters, setActiveFilters] = useState<TaskFilters>(defaultTaskFilters)
 
+  // Add this at the top of the component, after the state declarations:
+  const tasksLoadedRef = useRef(false)
+
+  // Add this function at the beginning of the TodoProvider component
+  const debugLocalStorage = () => {
+    console.log("[DEBUG] ===== localStorage Debug Info =====")
+    console.log("[DEBUG] localStorage available:", typeof window !== "undefined" && !!window.localStorage)
+
+    if (typeof window !== "undefined" && window.localStorage) {
+      console.log("[DEBUG] localStorage keys:", Object.keys(localStorage))
+      console.log("[DEBUG] todos in localStorage:", localStorage.getItem("todos"))
+      console.log("[DEBUG] categories in localStorage:", localStorage.getItem("categories"))
+      console.log("[DEBUG] user in localStorage:", localStorage.getItem("user"))
+    }
+
+    console.log("[DEBUG] ===== End localStorage Debug Info =====")
+  }
+
+  // Add this useEffect at the beginning of the component
+  useEffect(() => {
+    debugLocalStorage()
+
+    // Set up an interval to check localStorage periodically
+    const interval = setInterval(() => {
+      console.log("[DEBUG] Periodic localStorage check:")
+      debugLocalStorage()
+    }, 10000) // Check every 10 seconds
+
+    return () => clearInterval(interval)
+  }, [])
+
   useEffect(() => {
     // Define checkLocalStorage inside the effect
     const checkLocalStorage = () => {
@@ -125,63 +156,125 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
     checkLocalStorage()
   }, [toast]) // Add toast as a dependency
 
-  // Load tasks and categories from localStorage
+  // Then replace the useEffect with:
   useEffect(() => {
-    if (user) {
-      const storedTasks = localStorage.getItem("todos")
-      console.log("Loading tasks from localStorage:", storedTasks)
+    if (user && !tasksLoadedRef.current) {
+      console.log(`[DEBUG] Loading tasks for user ${user.id}, user object:`, user)
 
-      if (storedTasks) {
-        try {
-          const parsedTasks = JSON.parse(storedTasks)
-          console.log("Parsed tasks:", parsedTasks)
-
-          // Filter tasks for current user
-          const userTasks = parsedTasks.filter((task: Task) => task.userId === user.id)
-          console.log("User ID:", user.id, "Filtered tasks:", userTasks)
-
-          setTasks(userTasks)
-          setFilteredTasks(userTasks)
-        } catch (error) {
-          console.error("Error parsing stored tasks:", error)
+      try {
+        // Check if localStorage is available
+        if (typeof window === "undefined" || !window.localStorage) {
+          console.error("[DEBUG] localStorage is not available in this environment")
+          toast({
+            title: "Storage Error",
+            description: "Your browser storage is not available. Tasks may not be saved.",
+            variant: "destructive",
+          })
+          return
         }
-      } else {
-        console.log("No tasks found in localStorage")
-      }
 
-      const storedCategories = localStorage.getItem("categories")
-      if (storedCategories) {
-        try {
-          setCategories(JSON.parse(storedCategories))
-        } catch (error) {
-          console.error("Error parsing stored categories:", error)
+        // Log all localStorage keys for debugging
+        console.log("[DEBUG] All localStorage keys:", Object.keys(localStorage))
+
+        const storedTasks = localStorage.getItem("todos")
+        console.log("[DEBUG] Raw stored tasks:", storedTasks)
+
+        if (storedTasks) {
+          try {
+            const parsedTasks = JSON.parse(storedTasks)
+            console.log("[DEBUG] Parsed tasks:", parsedTasks)
+
+            // Filter tasks for current user
+            const userTasks = Array.isArray(parsedTasks)
+              ? parsedTasks.filter((task: Task) => task.userId === user.id)
+              : []
+
+            console.log(`[DEBUG] Filtered ${userTasks.length} tasks for user ${user.id}:`, userTasks)
+
+            // Only update state if we have tasks
+            if (userTasks.length > 0) {
+              setTasks(userTasks)
+              setFilteredTasks(userTasks)
+              tasksLoadedRef.current = true
+            }
+          } catch (error) {
+            console.error("[DEBUG] Error parsing stored tasks:", error)
+            toast({
+              title: "Error loading tasks",
+              description: "There was a problem loading your tasks. Please try refreshing the page.",
+              variant: "destructive",
+            })
+          }
+        } else {
+          console.log("[DEBUG] No tasks found in localStorage")
+          tasksLoadedRef.current = true // Mark as loaded even if no tasks found
         }
-      }
-    } else {
-      console.log("User not authenticated, skipping task loading")
-    }
-  }, [user])
-
-  // Save tasks and categories to localStorage
-  useEffect(() => {
-    try {
-      // Only save if there are tasks to save
-      if (tasks.length > 0) {
-        console.log("Saving tasks to localStorage:", tasks)
-        localStorage.setItem("todos", JSON.stringify(tasks))
-      }
-    } catch (error) {
-      console.error("Error saving tasks to localStorage:", error)
-      // Attempt to notify the user of the error
-      if (toast) {
+      } catch (error) {
+        console.error("[DEBUG] Error accessing localStorage:", error)
         toast({
-          title: "Error saving tasks",
-          description: "Your tasks couldn't be saved. Please try again or check browser storage settings.",
+          title: "Storage Error",
+          description: "There was a problem accessing your browser storage.",
           variant: "destructive",
         })
       }
+    } else if (!user) {
+      console.log("[DEBUG] User not authenticated, skipping task loading")
+      tasksLoadedRef.current = false // Reset when user logs out
     }
-  }, [tasks, toast])
+  }, [user, toast])
+
+  // Save tasks to localStorage
+  useEffect(() => {
+    if (!user) {
+      console.log("[DEBUG] No user, skipping task save")
+      return
+    }
+
+    console.log(`[DEBUG] Saving tasks for user ${user.id}, tasks:`, tasks)
+
+    try {
+      // Get existing tasks from localStorage
+      const existingTasksJSON = localStorage.getItem("todos")
+      let allTasks: Task[] = []
+
+      if (existingTasksJSON) {
+        try {
+          // Parse existing tasks
+          const existingTasks = JSON.parse(existingTasksJSON)
+          console.log("[DEBUG] Existing tasks from localStorage:", existingTasks)
+
+          if (Array.isArray(existingTasks)) {
+            // Filter out tasks for the current user (we'll replace them)
+            allTasks = existingTasks.filter((task: Task) => task.userId !== user.id)
+            console.log(`[DEBUG] Filtered out tasks for user ${user.id}, remaining:`, allTasks)
+          } else {
+            console.error("[DEBUG] Existing tasks is not an array:", existingTasks)
+          }
+        } catch (error) {
+          console.error("[DEBUG] Error parsing existing tasks:", error)
+          // If we can't parse existing tasks, we'll just use the current user's tasks
+        }
+      }
+
+      // Add current user's tasks
+      allTasks = [...allTasks, ...tasks]
+      console.log(`[DEBUG] Final tasks to save (${allTasks.length}):`, allTasks)
+
+      // Save to localStorage
+      localStorage.setItem("todos", JSON.stringify(allTasks))
+
+      // Verify the save worked
+      const verifyTasks = localStorage.getItem("todos")
+      console.log("[DEBUG] Verification - saved tasks:", verifyTasks)
+    } catch (error) {
+      console.error("[DEBUG] Error saving tasks to localStorage:", error)
+      toast({
+        title: "Error saving tasks",
+        description: "Your tasks couldn't be saved. Please try again or check browser storage settings.",
+        variant: "destructive",
+      })
+    }
+  }, [tasks, user, toast])
 
   useEffect(() => {
     // Save categories even if user is not logged in
@@ -204,6 +297,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
 
   const addTask = (task: Omit<Task, "id" | "createdAt" | "userId">) => {
     if (!user) {
+      console.log("[DEBUG] Attempted to add task without user")
       toast({
         title: "Authentication required",
         description: "You need to be logged in to add tasks.",
@@ -219,16 +313,44 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
       userId: user.id,
     }
 
-    console.log("Adding new task with user ID:", user.id, newTask)
+    console.log(`[DEBUG] Adding new task for user ${user.id}:`, newTask)
 
+    // Update state with the new task
     setTasks((prev) => {
       const updatedTasks = [newTask, ...prev]
-      // Immediately try to save to localStorage for extra safety
+      console.log("[DEBUG] Updated tasks state:", updatedTasks)
+
+      // Immediately save to localStorage
       try {
-        localStorage.setItem("todos", JSON.stringify(updatedTasks))
+        // Get existing tasks
+        const existingTasksJSON = localStorage.getItem("todos")
+        let allTasks: Task[] = []
+
+        if (existingTasksJSON) {
+          try {
+            const existingTasks = JSON.parse(existingTasksJSON)
+            if (Array.isArray(existingTasks)) {
+              // Filter out current user's tasks
+              allTasks = existingTasks.filter((t: Task) => t.userId !== user.id)
+            }
+          } catch (error) {
+            console.error("[DEBUG] Error parsing existing tasks during add:", error)
+          }
+        }
+
+        // Add all tasks including the new one
+        allTasks = [...allTasks, ...updatedTasks]
+        console.log("[DEBUG] Saving all tasks after add:", allTasks)
+
+        localStorage.setItem("todos", JSON.stringify(allTasks))
+
+        // Verify the save
+        const verifyTasks = localStorage.getItem("todos")
+        console.log("[DEBUG] Verification after add - saved tasks:", verifyTasks)
       } catch (error) {
-        console.error("Failed to save tasks after adding:", error)
+        console.error("[DEBUG] Failed to save tasks after adding:", error)
       }
+
       return updatedTasks
     })
 

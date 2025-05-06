@@ -30,6 +30,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Add a ref to track if we should allow clearing errors
   const allowClearErrorRef = useRef(false)
 
+  // Add this debugging function at the beginning of the AuthProvider component
+  const debugAuthState = (message: string) => {
+    console.log(`[AUTH DEBUG] ${message}`)
+    console.log("[AUTH DEBUG] Current user:", user)
+    console.log("[AUTH DEBUG] isLoading:", isLoading)
+    console.log("[AUTH DEBUG] error:", error)
+
+    // Check localStorage
+    if (typeof window !== "undefined" && window.localStorage) {
+      console.log("[AUTH DEBUG] user in localStorage:", localStorage.getItem("user"))
+    }
+  }
+
   useEffect(() => {
     // Check if user is logged in from localStorage
     const storedUser = localStorage.getItem("user")
@@ -45,6 +58,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
+  // Add this useEffect after the existing useEffect for loading user
+  useEffect(() => {
+    // Define the function inside the effect
+    const debugAuthState = (message: string) => {
+      console.log(`[AUTH DEBUG] ${message}`)
+      console.log("[AUTH DEBUG] Current user:", user)
+      console.log("[AUTH DEBUG] isLoading:", isLoading)
+      console.log("[AUTH DEBUG] error:", error)
+
+      // Check localStorage
+      if (typeof window !== "undefined" && window.localStorage) {
+        console.log("[AUTH DEBUG] user in localStorage:", localStorage.getItem("user"))
+      }
+    }
+
+    // Call it
+    debugAuthState("Auth state changed")
+  }, [user, isLoading, error])
+
   const clearError = () => {
     // Only clear error if explicitly allowed
     if (allowClearErrorRef.current) {
@@ -56,11 +88,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Replace the login function with this improved version
   const login = async (email: string, password: string): Promise<boolean> => {
+    debugAuthState("Login attempt started")
     setIsLoading(true)
-
-    // Important: Don't clear previous errors here
-    // We'll only clear errors on successful login
 
     // Add a small delay to simulate network request
     await new Promise((resolve) => setTimeout(resolve, 600))
@@ -80,9 +111,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: "testingtodo@gmail.com",
       }
 
+      console.log("[AUTH DEBUG] Login successful, setting user:", authorizedUser)
+
       setUser(authorizedUser)
-      localStorage.setItem("user", JSON.stringify(authorizedUser))
+
+      // Save user to localStorage with explicit error handling
+      try {
+        localStorage.setItem("user", JSON.stringify(authorizedUser))
+        console.log("[AUTH DEBUG] User saved to localStorage")
+
+        // Verify the save
+        const savedUser = localStorage.getItem("user")
+        console.log("[AUTH DEBUG] Verification - saved user:", savedUser)
+      } catch (error) {
+        console.error("[AUTH DEBUG] Error saving user to localStorage:", error)
+      }
+
       setIsLoading(false)
+      debugAuthState("Login completed successfully")
       return true // Successful login
     } else {
       // Set error message for invalid credentials with more specific feedback
@@ -91,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? "Invalid email address. Please try testingtodo@gmail.com"
           : "Invalid password. Please try again."
 
-      console.log("Setting error message:", errorMessage)
+      console.log("[AUTH DEBUG] Login failed, setting error:", errorMessage)
 
       // Set the error state
       setError(errorMessage)
@@ -99,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Important: We need to set isLoading to false AFTER setting the error
       setIsLoading(false)
 
+      debugAuthState("Login failed")
       // Return false to indicate login failure
       return false
     }

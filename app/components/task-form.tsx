@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar } from "@/components/ui/calendar"
+import { DayPicker } from "react-day-picker"
 import { useTodoContext, type Task, type Priority, type SubTask } from "../components/todo-provider"
 import { CalendarIcon, Plus, X } from "lucide-react"
 import { format } from "date-fns"
@@ -17,6 +17,9 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CategoryColorDot } from "../components/category-color-dot"
 import { generateId } from "@/lib/utils"
+
+// Import the CSS for react-day-picker
+import "react-day-picker/dist/style.css"
 
 interface TaskFormProps {
   task?: Task
@@ -232,7 +235,18 @@ export function TaskForm({ task, mode = "create", onSuccess }: TaskFormProps) {
                   </FormControl>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                  <DayPicker
+                    mode="single"
+                    modifiers={{ selected: field.value }}
+                    onDayClick={(day, modifiers) => {
+                      if (modifiers.selected) {
+                        field.onChange(undefined)
+                      } else {
+                        field.onChange(day)
+                      }
+                    }}
+                    initialFocus
+                  />
                 </PopoverContent>
               </Popover>
               <FormMessage />

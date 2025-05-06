@@ -8,6 +8,7 @@ import { useTodoContext, type Task } from "../components/todo-provider"
 import { TaskItem } from "../components/task-item"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { format, isSameDay } from "date-fns"
+import type { DayPickerProps } from "react-day-picker"
 
 export function TaskCalendar() {
   const { tasks } = useTodoContext()
@@ -53,28 +54,21 @@ export function TaskCalendar() {
     })
   }
 
-  // Custom day content renderer
-  // const renderDayContent = (date: Date) => {
-  //   const dateKey = format(date, "yyyy-MM-dd")
-  //   const tasksForDay = tasksByDate[dateKey] || []
-  //   const hasOverdueTasks = tasksForDay.some((task) => !task.completed && new Date(task.dueDate!) < new Date())
+  // Define modifiers for days with tasks
+  const modifiers: DayPickerProps["modifiers"] = {
+    selected: selectedDate,
+    "with-tasks": (date: Date) => {
+      const dateKey = format(date, "yyyy-MM-dd")
+      return (tasksByDate[dateKey]?.length || 0) > 0
+    },
+    "with-overdue-tasks": (date: Date) => {
+      const dateKey = format(date, "yyyy-MM-dd")
+      const tasksForDay = tasksByDate[dateKey] || []
+      return tasksForDay.some((task) => !task.completed && new Date(task.dueDate!) < new Date())
+    },
+  }
 
-  //   if (tasksForDay.length > 0) {
-  //     return (
-  //       <div className="relative w-full h-full flex items-center justify-center">
-  //         {format(date, "d")}
-  //         <Badge
-  //           variant={hasOverdueTasks ? "destructive" : "secondary"}
-  //           className="absolute bottom-0 right-0 -mr-1 -mb-1 w-4 h-4 p-0 flex items-center justify-center text-[10px]"
-  //         >
-  //           {tasksForDay.length}
-  //         </Badge>
-  //       </div>
-  //     )
-  //   }
-
-  //   return format(date, "d")
-  // }
+  // Removed the unused handleDayClick function
 
   return (
     <div className="grid gap-6 md:grid-cols-[400px_1fr]">
@@ -93,10 +87,10 @@ export function TaskCalendar() {
           </div>
 
           <style jsx global>{`
-            .day-with-tasks {
+            .rdp-day_with-tasks {
               position: relative;
             }
-            .day-with-tasks::after {
+            .rdp-day_with-tasks::after {
               content: '';
               position: absolute;
               bottom: 4px;
@@ -107,7 +101,15 @@ export function TaskCalendar() {
               border-radius: 50%;
               background-color: hsl(var(--primary));
             }
-            .day-with-overdue-tasks::after {
+            .rdp-day_with-overdue-tasks::after {
+              content: '';
+              position: absolute;
+              bottom: 4px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 4px;
+              height: 4px;
+              border-radius: 50%;
               background-color: hsl(var(--destructive));
             }
           `}</style>
@@ -119,23 +121,11 @@ export function TaskCalendar() {
             month={month}
             onMonthChange={setMonth}
             className="rounded-md border"
-            modifiers={{
-              // Use modifiers instead of dynamic classNames
-              "with-tasks": (date) => {
-                const dateKey = format(date, "yyyy-MM-dd")
-                return (tasksByDate[dateKey]?.length || 0) > 0
-              },
-              "with-overdue-tasks": (date) => {
-                const dateKey = format(date, "yyyy-MM-dd")
-                const tasksForDay = tasksByDate[dateKey] || []
-                return tasksForDay.some((task) => !task.completed && new Date(task.dueDate!) < new Date())
-              },
-            }}
+            modifiers={modifiers}
             modifiersClassNames={{
-              "with-tasks": "day-with-tasks",
-              "with-overdue-tasks": "day-with-overdue-tasks",
+              "with-tasks": "rdp-day_with-tasks",
+              "with-overdue-tasks": "rdp-day_with-overdue-tasks",
             }}
-            // Remove the formatters that were causing issues
           />
         </CardContent>
       </Card>
